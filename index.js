@@ -101,6 +101,89 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
 
+  if (message.mentions.has(client.user)) {
+    if (!message.mentions.users.first()) return;
+    if (message.mentions.users.first().id !== client.user.id) return;
+    if (message.mentions.repliedUser) return;
+
+    const command = message.content.split(" ");
+
+    const day = moment(command[1]) || moment();
+
+    db.get(
+      "SELECT * FROM users WHERE id = ?",
+      [message.member.id],
+      async (err, row) => {
+        if (!row) {
+          db.get(
+            "SELECT * FROM guilds WHERE id = ?",
+            [message.guild.id],
+            async (err, row2) => {
+              if (err) {
+                console.error(err.message);
+                return;
+              }
+
+              console.log(row2);
+
+              if (!row2) {
+                message.reply(
+                  "학교가 설정되지 않았습니다. `!school` 명령어를 사용해서 학교를 선택해주세요."
+                );
+                return;
+              }
+
+              const bob = await getbob(
+                day.format("YYYYMMDD"),
+                row2.schoolcode,
+                row2.sccode
+              );
+
+              if (bob === undefined) {
+                message.reply(
+                  `${day.format("YYYY. MM. DD.")} 에는 급식이 없습니다.`
+                );
+                return;
+              }
+
+              var acbob = {};
+              bob[1].row.forEach((menu) => {
+                acbob[menu.MMEAL_SC_NM] = menu.DDISH_NM.replace(
+                  /<br\/>/g,
+                  "\n"
+                );
+              });
+              message.reply({
+                embeds: [makeBobEmbed(acbob, day.format("YYYY. MM. DD."))],
+              });
+              console.log(acbob);
+            }
+          );
+          return;
+        }
+
+        const bob = await getbob(
+          day.format("YYYYMMDD"),
+          row.schoolcode,
+          row.sccode
+        );
+
+        if (bob === undefined) {
+          message.reply(`${day.format("YYYY. MM. DD.")} 에는 급식이 없습니다.`);
+          return;
+        }
+
+        var acbob = {};
+        bob[1].row.forEach((menu) => {
+          acbob[menu.MMEAL_SC_NM] = menu.DDISH_NM.replace(/<br\/>/g, "\n");
+        });
+        message.reply({
+          embeds: [makeBobEmbed(acbob, day.format("YYYY. MM. DD."))],
+        });
+      }
+    );
+  }
+
   if (message.content.startsWith("!bob")) {
     const bob = await getbob("20240619", "7310068", "E10");
 
